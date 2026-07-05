@@ -1,0 +1,9 @@
+{
+  "appId": "com.faithwalk.app",
+  "appName": "Faith Walk",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "the-preach",
+  "version": "1.1.0",
+  "description": "Daily Christian growth companion - Bible verses, prayers, quizzes, sermons, and audio playback with bookmarks",
+  "main": "main.js",
+  "scripts": {
+    "start": "./scripts/the-preach.sh",
+    "dev": "./scripts/the-preach.sh --dev",
+    "serve": "node scripts/serve.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0"
+  },
+  "keywords": []
+}

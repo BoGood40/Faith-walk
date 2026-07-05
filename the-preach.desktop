@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=The Preach
+Comment=Daily Christian Growth Companion
+Exec=/home/taipan/realhunt/faith-walk/scripts/the-preach.sh
+Terminal=false
+Type=Application
+Categories=Utility;
+Icon=/home/taipan/realhunt/faith-walk/assets/icons/app-icon.svg
+StartupWMClass=the-preach
+MimeType=text/html;
