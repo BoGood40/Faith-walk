@@ -66,6 +66,10 @@ let dailyVerseHistory = [];
 let deferredPrompt = null;
 let currentSermon = null;
 let notesCache = [];
+let editingNoteId = null;
+let currentNotesView = 'solar';
+let selectedNote = null;
+let currentNoteFilterBook = 'all';
 function debounce(fn, ms) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
 
 function toast(msg, type = 'info') {
@@ -130,7 +134,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('loadingScreen').style.display = 'none';
   });
   window.api.onBibleNotLoaded(() => showBibleNotice(false));
-  window.api.onBibleLoaded(() => hideBibleNotice());
+  window.api.onBibleLoaded(async () => {
+    hideBibleNotice();
+    await updateDashboard();
+    if (currentPage === 'bible-reader') {
+      await setupBibleReader();
+    }
+  });
 });
 
 async function initApp() {
@@ -230,9 +240,9 @@ function setupEventDelegation() {
   document.getElementById('saveDailyVerse').onclick = async () => {
     const ref = document.getElementById('dailyVerseRef').textContent;
     const text = document.getElementById('dailyVerseText').textContent;
-    const match = ref.match(/^(\d?\s?\w+)\s+(\d+):(\d+)$/);
-    if (match) {
-      await window.api.saveNote(ref, text, match[1].trim(), parseInt(match[2]), parseInt(match[3]));
+    const parsed = parseVerseReference(ref);
+    if (parsed) {
+      await window.api.saveNote(ref, text, parsed.book, parsed.chapter, parsed.verse);
       toast('Verse saved to notes!', 'success');
     }
   };
@@ -392,15 +402,98 @@ async function loadDailyVerse(direction) {
   }
 }
 
+const BIBLE_BOOKS = [
+  'Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth',
+  '1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra',
+  'Nehemiah','Esther','Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon',
+  'Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos',
+  'Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah',
+  'Malachi','Matthew','Mark','Luke','John','Acts','Romans','1 Corinthians',
+  '2 Corinthians','Galatians','Ephesians','Philippians','Colossians',
+  '1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon',
+  'Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'
+];
+
+const BOOK_ABBREVIATIONS = {
+  'gen': 'Genesis', 'ex': 'Exodus', 'exo': 'Exodus', 'lev': 'Leviticus', 'num': 'Numbers', 'dt': 'Deuteronomy', 'deut': 'Deuteronomy',
+  'josh': 'Joshua', 'judg': 'Judges', 'jdg': 'Judges', 'rt': 'Ruth', 'rut': 'Ruth',
+  '1 sam': '1 Samuel', '1sam': '1 Samuel', '1s': '1 Samuel', '2 sam': '2 Samuel', '2sam': '2 Samuel', '2s': '2 Samuel',
+  '1 ki': '1 Kings', '1kings': '1 Kings', '1k': '1 Kings', '2 ki': '2 Kings', '2kings': '2 Kings', '2k': '2 Kings',
+  '1 chr': '1 Chronicles', '1chron': '1 Chronicles', '1chronicles': '1 Chronicles', '2 chr': '2 Chronicles', '2chron': '2 Chronicles', '2chronicles': '2 Chronicles',
+  'ezr': 'Ezra', 'neh': 'Nehemiah', 'est': 'Esther', 'esth': 'Esther', 'jb': 'Job', 'ps': 'Psalms', 'psa': 'Psalms', 'psalm': 'Psalms', 'prov': 'Proverbs', 'pr': 'Proverbs',
+  'eccl': 'Ecclesiastes', 'ecc': 'Ecclesiastes', 'song': 'Song of Solomon', 'songs': 'Song of Solomon', 'canticles': 'Song of Solomon',
+  'isa': 'Isaiah', 'is': 'Isaiah', 'jer': 'Jeremiah', 'jr': 'Jeremiah', 'lam': 'Lamentations', 'ezek': 'Ezekiel', 'ezk': 'Ezekiel', 'dan': 'Daniel', 'dn': 'Daniel',
+  'hos': 'Hosea', 'jl': 'Joel', 'joe': 'Joel', 'am': 'Amos', 'ob': 'Obadiah', 'obad': 'Obadiah', 'jon': 'Jonah', 'mic': 'Micah', 'nah': 'Nahum', 'hab': 'Habakkuk',
+  'zeph': 'Zephaniah', 'zph': 'Zephaniah', 'hag': 'Haggai', 'zech': 'Zechariah', 'zec': 'Zechariah', 'mal': 'Malachi', 'ml': 'Malachi',
+  'matt': 'Matthew', 'mat': 'Matthew', 'mt': 'Matthew', 'mk': 'Mark', 'mrk': 'Mark', 'lk': 'Luke', 'luk': 'Luke', 'jn': 'John', 'joh': 'John', 'act': 'Acts',
+  'rom': 'Romans', 'rm': 'Romans', '1 cor': '1 Corinthians', '1cor': '1 Corinthians', '2 cor': '2 Corinthians', '2cor': '2 Corinthians',
+  'gal': 'Galatians', 'eph': 'Ephesians', 'phil': 'Philippians', 'php': 'Philippians', 'col': 'Colossians', 'cl': 'Colossians',
+  '1 thess': '1 Thessalonians', '1thess': '1 Thessalonians', '1th': '1 Thessalonians', '2 thess': '2 Thessalonians', '2thess': '2 Thessalonians', '2th': '2 Thessalonians',
+  '1 tim': '1 Timothy', '1tim': '1 Timothy', '2 tim': '2 Timothy', '2tim': '2 Timothy', 'tit': 'Titus', 'phlm': 'Philemon', 'phile': 'Philemon',
+  'heb': 'Hebrews', 'jas': 'James', 'jam': 'James', '1 pet': '1 Peter', '1pet': '1 Peter', '2 pet': '2 Peter', '2pet': '2 Peter',
+  '1 jn': '1 John', '1jn': '1 John', '1j': '1 John', '2 jn': '2 John', '2jn': '2 John', '2j': '2 John', '3 jn': '3 John', '3jn': '3 John', '3j': '3 John',
+  'jud': 'Jude', 'rev': 'Revelation', 'revel': 'Revelation'
+};
+
+function resolveBookName(query) {
+  if (!query) return '';
+  const clean = query.trim().toLowerCase().replace(/\s+/g, ' ').replace(/\./g, '');
+  
+  if (BOOK_ABBREVIATIONS[clean]) {
+    return BOOK_ABBREVIATIONS[clean];
+  }
+  
+  const directMatch = BIBLE_BOOKS.find(b => b.toLowerCase() === clean);
+  if (directMatch) return directMatch;
+  
+  const startsWithMatch = BIBLE_BOOKS.find(b => b.toLowerCase().startsWith(clean));
+  if (startsWithMatch) return startsWithMatch;
+  
+  return '';
+}
+
+function parseVerseReference(verseRef) {
+  if (!verseRef) return null;
+  // Regex that matches:
+  // Group 1: Book name: numbers, letters, spaces (multi-word support)
+  // Group 2: Chapter: digits
+  // Group 3: Optional colon or dot, followed by digits (start verse)
+  // Group 4: Optional dash followed by digits (end verse)
+  const regex = /^(\d?\s*[A-Za-z]+(?:\s+[A-Za-z]+)*)\s*(\d+)(?:[:.](\d+))?(?:\s*-\s*(\d+))?$/;
+  const match = verseRef.trim().match(regex);
+  if (!match) return null;
+
+  const rawBook = match[1].trim();
+  const book = resolveBookName(rawBook) || rawBook;
+  const chapter = parseInt(match[2], 10);
+  const verse = match[3] ? parseInt(match[3], 10) : null;
+  const endVerse = match[4] ? parseInt(match[4], 10) : null;
+
+  return { book, chapter, verse, endVerse };
+}
+
 async function setupBibleReader() {
   const books = await window.api.getBookNames();
   const bookSelect = document.getElementById('bookSelect');
   const chapterSelect = document.getElementById('chapterSelect');
   const versionSelect = document.getElementById('versionSelect');
 
+  const SUPPORTED_VERSIONS = {
+    kjv: 'KJV',
+    asv: 'ASV',
+    web: 'WEB',
+    bsb: 'BSB',
+    dra: 'DRA',
+    rv: 'RV',
+    t4t: 'T4T'
+  };
+
   const status = await window.api.getBibleStatus();
-  versionSelect.innerHTML = '<option value="kjv">KJV</option>' +
-    (status.versions.nkjv ? '<option value="nkjv">NKJV</option>' : '<option value="nkjv" disabled>NKJV (loading...)</option>');
+  const optionsHtml = Object.entries(SUPPORTED_VERSIONS).map(([vCode, vName]) => {
+    const isDownloaded = status.versions[vCode];
+    return `<option value="${vCode}">${vName}${isDownloaded ? '' : ' (Click to Download)'}</option>`;
+  }).join('');
+  versionSelect.innerHTML = optionsHtml;
   versionSelect.value = status.currentVersion || 'kjv';
 
   bookSelect.innerHTML = '<option value="">Select Book</option>' + books.map(b => `<option value="${b}">${b}</option>`).join('');
@@ -408,20 +501,51 @@ async function setupBibleReader() {
 
   versionSelect.onchange = async () => {
     const v = versionSelect.value;
-    const res = await window.api.setBibleVersion(v);
-    if (res.success) {
-      toast(`Switched to ${v.toUpperCase()}`, 'success');
-      const book = bookSelect.value;
-      const chapter = parseInt(chapterSelect.value);
-      if (book && chapter) await loadChapter(book, chapter);
+    const oldVersion = status.currentVersion || 'kjv';
+    if (v === oldVersion) return;
+
+    // Check if selected version is already downloaded
+    const currentStatus = await window.api.getBibleStatus();
+    const isDownloaded = currentStatus.versions[v];
+
+    if (!isDownloaded) {
+      toast(`Downloading and compiling ${v.toUpperCase()} Bible from CDN... This can take ~15s. Please wait.`, 'info');
+    } else {
+      toast(`Switching to ${v.toUpperCase()}...`, 'info');
+    }
+
+    // Temporarily disable the dropdown to prevent multiple parallel download triggers
+    versionSelect.disabled = true;
+
+    try {
+      const res = await window.api.setBibleVersion(v);
+      if (res.success) {
+        toast(`Switched to ${v.toUpperCase()}`, 'success');
+
+        // Refresh dropdown options labels to remove the "(Click to Download)" suffix
+        const newStatus = await window.api.getBibleStatus();
+        const newOptionsHtml = Object.entries(SUPPORTED_VERSIONS).map(([vCode, vName]) => {
+          const loaded = newStatus.versions[vCode];
+          return `<option value="${vCode}">${vName}${loaded ? '' : ' (Click to Download)'}</option>`;
+        }).join('');
+        versionSelect.innerHTML = newOptionsHtml;
+        versionSelect.value = v;
+
+        const book = bookSelect.value;
+        const chapter = parseInt(chapterSelect.value);
+        if (book && chapter) await loadChapter(book, chapter);
+      } else {
+        toast(`Failed to load/download ${v.toUpperCase()} Bible. Please check your network connection.`, 'error');
+        versionSelect.value = oldVersion;
+      }
+    } catch (e) {
+      console.error(e);
+      toast(`Error switching to ${v.toUpperCase()}: ${e.message}`, 'error');
+      versionSelect.value = oldVersion;
+    } finally {
+      versionSelect.disabled = false;
     }
   };
-
-  window.api.onBibleVersionReady((version) => {
-    const opt = versionSelect.querySelector(`option[value="${version}"]`);
-    if (opt) { opt.disabled = false; opt.textContent = version.toUpperCase(); }
-    toast(`${version.toUpperCase()} Bible loaded!`, 'success');
-  });
 
   bookSelect.onchange = async () => {
     const book = bookSelect.value;
@@ -450,21 +574,17 @@ async function setupBibleReader() {
   // Quick verse jump (BLB-style)
   const jumpInput = document.getElementById('verseJump');
   const jumpBtn = document.getElementById('jumpBtn');
-  const parseRef = (s) => {
-    const m = s.match(/^(\d?\s*[A-Za-z]+)\s*(\d+):(\d+)(?:-(\d+))?$/);
-    if (!m) return null;
-    let bookName = m[1].trim();
-    const numMap = {'1':'1 ','2':'2 ','3':'3 '};
-    if (/^\d/.test(bookName) && numMap[bookName[0]]) bookName = numMap[bookName[0]] + bookName.slice(1).trim();
-    return { book: bookName, chapter: parseInt(m[2]), verse: parseInt(m[3]), endVerse: m[4] ? parseInt(m[4]) : null };
-  };
   const doJump = async () => {
-    const ref = parseRef(jumpInput.value.trim());
+    const ref = parseVerseReference(jumpInput.value.trim());
     if (ref) {
       const chapters = await window.api.getChaptersForBook(ref.book);
       if (chapters.includes(ref.chapter)) {
         bookSelect.value = ref.book;
-        chapterSelect.value = ref.chapter;
+        // Populate chapterSelect options synchronously to avoid empty option state
+        const chaptersForBook = await window.api.getChaptersForBook(ref.book);
+        chapterSelect.innerHTML = '<option value="">Chapter</option>' + chaptersForBook.map(c => `<option value="${c}">${c}</option>`).join('');
+        chapterSelect.value = String(ref.chapter);
+        
         if (ref.verse) {
           await loadVerses(ref.book, ref.chapter, ref.verse, ref.endVerse || ref.verse);
         } else {
@@ -474,7 +594,7 @@ async function setupBibleReader() {
         toast('Chapter not found in ' + ref.book, 'error');
       }
     } else {
-      toast('Invalid reference. Use format: Book Chapter:Verse (e.g. John 3:16)', 'error');
+      toast('Invalid reference. Use format: Book Chapter:Verse (e.g. John 3:16) or Book Chapter (e.g. Genesis 1)', 'error');
     }
   };
   jumpBtn.onclick = doJump;
@@ -615,9 +735,9 @@ async function loadPrayers() {
     }
     if (matched.length > 0) {
       const refs = await Promise.all(matched.map(async (v) => {
-        const parts = v.match(/^(\d?\s?\w+)\s+(\d+):(\d+)-?(\d*)?$/);
-        if (parts) {
-          const verse = await window.api.getVerse(parts[1].trim(), parseInt(parts[2]), parseInt(parts[3]));
+        const parsed = parseVerseReference(v);
+        if (parsed) {
+          const verse = await window.api.getVerse(parsed.book, parsed.chapter, parsed.verse);
           return verse ? { ref: v, text: verse.text } : null;
         }
         return null;
@@ -929,111 +1049,440 @@ function startSolarAnimation() {
 async function loadNotes() {
   notesCache = await window.api.getNotes();
   const notes = notesCache;
-  const solarBodies = document.getElementById('solarBodies');
-  const emptyMsg = document.getElementById('solarEmpty');
-  const solarSystem = document.getElementById('solarSystem');
-  
-  if (notes.length === 0) {
-    emptyMsg.style.display = 'flex';
-    solarSystem.style.display = 'none';
-    generateStarfield(40);
-    return;
-  }
-  
-  emptyMsg.style.display = 'none';
-  solarSystem.style.display = 'flex';
-  
-  const groups = groupNotesByBook(notes);
-  const { planets, rings } = assignOrbits(groups);
-  
-  generateStarfield(60);
-  
-  // Orbit rings
-  let html = rings.map(r =>
-    `<div class="orbit-ring" style="width:${r * 2}px;height:${r * 2}px;"></div>`
-  ).join('');
-  
-  // Planets
-  for (const planet of planets) {
-    html += buildSolarPlanet(planet);
-  }
-  
-  solarBodies.innerHTML = html;
-  solarAngleOffset = 0;
-  updateSolarPositions();
-  
-  // Init drag, parallax, and animation (once)
-  if (!solarInitialized) {
-    solarInitialized = true;
-    initSolarDrag();
-    initSolarParallax();
-    startSolarAnimation();
-  }
-  
-  // Attach events
-  document.querySelectorAll('.planet-group').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      togglePlanet(el);
+
+  // Bind view switch buttons
+  setupNotesViewSwitcher();
+
+  const solarContainer = document.getElementById('solarSystemContainer');
+  const listContainer = document.getElementById('notesListContainer');
+  const solarControls = document.getElementById('solarZoomControls');
+  const composer = document.getElementById('noteComposer');
+  const subtitle = document.getElementById('notesPageSubtitle');
+
+  // Handle views
+  if (currentNotesView === 'solar') {
+    solarContainer.style.display = 'block';
+    solarControls.style.display = 'flex';
+    listContainer.style.display = 'none';
+    composer.style.display = 'none';
+    subtitle.textContent = "Explore your study notes orbiting God's Word";
+
+    const solarBodies = document.getElementById('solarBodies');
+    const emptyMsg = document.getElementById('solarEmpty');
+    const solarSystem = document.getElementById('solarSystem');
+    
+    if (notes.length === 0) {
+      emptyMsg.style.display = 'flex';
+      solarSystem.style.display = 'none';
+      generateStarfield(40);
+      return;
+    }
+    
+    emptyMsg.style.display = 'none';
+    solarSystem.style.display = 'flex';
+    
+    const groups = groupNotesByBook(notes);
+    const { planets, rings } = assignOrbits(groups);
+    
+    generateStarfield(60);
+    
+    // Orbit rings
+    let html = rings.map(r =>
+      `<div class="orbit-ring" style="width:${r * 2}px;height:${r * 2}px;"></div>`
+    ).join('');
+    
+    // Planets
+    for (const planet of planets) {
+      html += buildSolarPlanet(planet);
+    }
+    
+    solarBodies.innerHTML = html;
+    solarAngleOffset = 0;
+    updateSolarPositions();
+    
+    // Init drag, parallax, and animation (once)
+    if (!solarInitialized) {
+      solarInitialized = true;
+      initSolarDrag();
+      initSolarParallax();
+      startSolarAnimation();
+    }
+    
+    // Attach events
+    document.querySelectorAll('.planet-group').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePlanet(el);
+      });
+      
+      el.addEventListener('mouseenter', () => {
+        const name = el.dataset.book;
+        const count = el.dataset.count;
+        showTooltip(el, `${name} — ${count} note${count > 1 ? 's' : ''}`);
+      });
+      
+      el.addEventListener('mouseleave', hideTooltip);
     });
     
-    el.addEventListener('mouseenter', () => {
-      const name = el.dataset.book;
-      const count = el.dataset.count;
-      showTooltip(el, `${name} — ${count} note${count > 1 ? 's' : ''}`);
+    document.querySelectorAll('.moon').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = parseInt(el.dataset.noteId);
+        if (id) {
+          editingNoteId = id;
+          editNote(id);
+        }
+      });
+      
+      el.addEventListener('mouseenter', () => {
+        const title = el.dataset.noteTitle || '';
+        showTooltip(el, title);
+      });
+      
+      el.addEventListener('mouseleave', hideTooltip);
     });
+
+    const showSolar = () => {
+      composer.style.display = 'none';
+      solarContainer.style.display = 'block';
+    };
     
-    el.addEventListener('mouseleave', hideTooltip);
+    document.getElementById('newNoteBtn').onclick = () => {
+      editingNoteId = null;
+      solarContainer.style.display = 'none';
+      composer.style.display = 'block';
+      document.getElementById('noteTitle').value = '';
+      document.getElementById('noteContent').value = '';
+      document.getElementById('noteVerseRef').value = '';
+      document.getElementById('noteTitle').focus();
+    };
+
+    document.getElementById('cancelNote').onclick = () => {
+      showSolar();
+      editingNoteId = null;
+      document.getElementById('noteTitle').value = '';
+      document.getElementById('noteContent').value = '';
+      document.getElementById('noteVerseRef').value = '';
+    };
+
+    document.getElementById('saveNoteBtn').onclick = async () => {
+      const title = document.getElementById('noteTitle').value.trim();
+      const content = document.getElementById('noteContent').value.trim();
+      if (!title || !content) return;
+      const verseRef = document.getElementById('noteVerseRef').value.trim();
+      let book = null, chapter = null, verse = null;
+      if (verseRef) {
+        const parsed = parseVerseReference(verseRef);
+        if (parsed) {
+          book = parsed.book;
+          chapter = parsed.chapter;
+          verse = parsed.verse;
+        }
+      }
+      
+      if (editingNoteId !== null) {
+        await window.api.updateNote(editingNoteId, title, content);
+        toast('Note updated!', 'success');
+      } else {
+        await window.api.saveNote(title, content, book, chapter, verse);
+        toast('Note saved!', 'success');
+      }
+      
+      showSolar();
+      editingNoteId = null;
+      document.getElementById('noteTitle').value = '';
+      document.getElementById('noteContent').value = '';
+      document.getElementById('noteVerseRef').value = '';
+      await loadNotes();
+    };
+
+  } else {
+    solarContainer.style.display = 'none';
+    solarControls.style.display = 'none';
+    listContainer.style.display = 'block';
+    composer.style.display = 'none';
+    subtitle.textContent = "Browse and search all your personal study notes and revelations";
+
+    renderNotesListView();
+  }
+}
+
+function setupNotesViewSwitcher() {
+  const btnSolar = document.getElementById('btnViewSolar');
+  const btnList = document.getElementById('btnViewList');
+  if (!btnSolar || !btnList || btnSolar._bound) return;
+  btnSolar._bound = true;
+
+  btnSolar.onclick = () => {
+    btnSolar.classList.add('active');
+    btnList.classList.remove('active');
+    currentNotesView = 'solar';
+    loadNotes();
+  };
+
+  btnList.onclick = () => {
+    btnList.classList.add('active');
+    btnSolar.classList.remove('active');
+    currentNotesView = 'list';
+    loadNotes();
+  };
+
+  if (currentNotesView === 'solar') {
+    btnSolar.classList.add('active');
+    btnList.classList.remove('active');
+  } else {
+    btnList.classList.add('active');
+    btnSolar.classList.remove('active');
+  }
+}
+
+function renderNotesListView() {
+  // 1. Setup New Note Button for List View
+  document.getElementById('newNoteBtn').onclick = () => {
+    editingNoteId = null;
+    selectedNote = null;
+    showInlineComposer();
+  };
+
+  // 2. Setup Search listener (once)
+  const searchInput = document.getElementById('notesSearchInput');
+  if (searchInput && !searchInput._bound) {
+    searchInput._bound = true;
+    searchInput.addEventListener('input', debounce(() => renderNotesSidebarList(), 200));
+  }
+
+  // 3. Render categories (tabs) & notes list
+  renderNotesCategories();
+  renderNotesSidebarList();
+  renderNotesDetailPanel();
+}
+
+function renderNotesCategories() {
+  const tabsContainer = document.getElementById('notesCategoryTabs');
+  if (!tabsContainer) return;
+
+  const books = [...new Set(notesCache.map(n => n.book || 'General'))].sort();
+  
+  let html = `<button class="cat-btn${currentNoteFilterBook === 'all' ? ' active' : ''}" data-cat="all">All</button>`;
+  
+  books.forEach(b => {
+    html += `<button class="cat-btn${currentNoteFilterBook === b ? ' active' : ''}" data-cat="${escapeHtml(b)}">${escapeHtml(b)}</button>`;
   });
   
-  document.querySelectorAll('.moon').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = parseInt(el.dataset.noteId);
-      if (id) editNote(id);
-    });
+  tabsContainer.innerHTML = html;
+
+  tabsContainer.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.onclick = () => {
+      tabsContainer.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentNoteFilterBook = btn.dataset.cat;
+      renderNotesSidebarList();
+    };
+  });
+}
+
+function renderNotesSidebarList() {
+  const listContainer = document.getElementById('notesList');
+  if (!listContainer) return;
+
+  const searchQuery = (document.getElementById('notesSearchInput')?.value || '').toLowerCase().trim();
+  
+  const filtered = notesCache.filter(n => {
+    const bookName = n.book || 'General';
+    const matchesBook = currentNoteFilterBook === 'all' || bookName === currentNoteFilterBook;
     
-    el.addEventListener('mouseenter', () => {
-      const title = el.dataset.noteTitle || '';
-      showTooltip(el, title);
-    });
-    
-    el.addEventListener('mouseleave', hideTooltip);
+    const matchesSearch = !searchQuery || 
+      (n.title || '').toLowerCase().includes(searchQuery) ||
+      (n.content || '').toLowerCase().includes(searchQuery) ||
+      bookName.toLowerCase().includes(searchQuery);
+      
+    return matchesBook && matchesSearch;
   });
 
-  const showSolar = () => {
-    document.getElementById('noteComposer').style.display = 'none';
-    document.getElementById('solarSystemContainer').style.display = 'block';
-  };
+  if (filtered.length === 0) {
+    listContainer.innerHTML = `<div class="sermon-index-empty" style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 12px;">No notes found</div>`;
+    return;
+  }
+
+  listContainer.innerHTML = filtered.map((n, i) => {
+    const isActive = selectedNote && selectedNote.id === n.id;
+    const dateStr = n.created_at ? new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+    const refStr = n.book ? `${n.book} ${n.chapter || ''}:${n.verse || ''}`.trim() : '';
+    const snippet = n.content ? (n.content.length > 80 ? n.content.substring(0, 80) + '...' : n.content) : '';
+    
+    return `
+      <div class="note-index-item${isActive ? ' active' : ''}" data-id="${n.id}">
+        <div class="note-index-num">${String(i + 1).padStart(2, '0')}</div>
+        <div class="note-index-info">
+          <div class="note-index-title">${escapeHtml(n.title || 'Untitled')}</div>
+          <div class="note-index-snippet">${escapeHtml(snippet)}</div>
+          <div class="note-index-meta">
+            <span class="notes-reader-date">${dateStr}</span>
+            ${refStr ? `<span class="note-index-ref">${escapeHtml(refStr)}</span>` : ''}
+          </div>
+        </div>
+        <svg class="sermon-index-arrow" viewBox="0 0 24 24" width="14" height="14" style="align-self: center; color: var(--text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    `;
+  }).join('');
+
+  listContainer.querySelectorAll('.note-index-item').forEach(item => {
+    item.onclick = () => {
+      const id = parseInt(item.dataset.id);
+      selectedNote = notesCache.find(n => n.id === id);
+      editingNoteId = null;
+      
+      listContainer.querySelectorAll('.note-index-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      
+      renderNotesDetailPanel();
+    };
+  });
+}
+
+function renderNotesDetailPanel() {
+  const emptyState = document.getElementById('notesEmptyState');
+  const readerContent = document.getElementById('notesReaderContent');
+  const inlineComposer = document.getElementById('notesInlineComposer');
   
-  document.getElementById('newNoteBtn').onclick = () => {
-    document.getElementById('solarSystemContainer').style.display = 'none';
-    document.getElementById('noteComposer').style.display = 'block';
-    document.getElementById('noteTitle').focus();
+  if (editingNoteId !== null || (editingNoteId === null && selectedNote === null && inlineComposer.style.display === 'block')) {
+    showInlineComposer();
+    return;
+  }
+
+  if (!selectedNote) {
+    emptyState.style.display = 'flex';
+    readerContent.style.display = 'none';
+    inlineComposer.style.display = 'none';
+    return;
+  }
+
+  emptyState.style.display = 'none';
+  readerContent.style.display = 'block';
+  inlineComposer.style.display = 'none';
+
+  const titleEl = document.getElementById('notesReaderTitle');
+  const refEl = document.getElementById('notesReaderRef');
+  const dateEl = document.getElementById('notesReaderDate');
+  const bodyEl = document.getElementById('notesReaderBody');
+
+  titleEl.textContent = selectedNote.title || 'Untitled';
+  dateEl.textContent = selectedNote.created_at ? new Date(selectedNote.created_at).toLocaleString() : '';
+  
+  const refText = selectedNote.book ? `${selectedNote.book} ${selectedNote.chapter || ''}:${selectedNote.verse || ''}`.trim() : '';
+  if (refText) {
+    refEl.textContent = refText;
+    refEl.style.display = 'inline-block';
+    refEl.onclick = async () => {
+      await navigateToReading(selectedNote.book, selectedNote.chapter || 1);
+    };
+  } else {
+    refEl.style.display = 'none';
+  }
+
+  bodyEl.textContent = selectedNote.content || '';
+
+  document.getElementById('editNoteBtn').onclick = () => {
+    editingNoteId = selectedNote.id;
+    showInlineComposer();
   };
-  document.getElementById('cancelNote').onclick = () => {
-    showSolar();
-    document.getElementById('noteTitle').value = '';
-    document.getElementById('noteContent').value = '';
-    document.getElementById('noteVerseRef').value = '';
+
+  document.getElementById('deleteNoteBtn').onclick = async () => {
+    if (await showConfirm('Delete this study note?')) {
+      await window.api.deleteNote(selectedNote.id);
+      selectedNote = null;
+      editingNoteId = null;
+      toast('Note deleted', 'info');
+      await loadNotes();
+    }
   };
-  document.getElementById('saveNoteBtn').onclick = async () => {
-    const title = document.getElementById('noteTitle').value.trim();
-    const content = document.getElementById('noteContent').value.trim();
-    if (!title || !content) return;
-    const verseRef = document.getElementById('noteVerseRef').value.trim();
+}
+
+function showInlineComposer() {
+  const emptyState = document.getElementById('notesEmptyState');
+  const readerContent = document.getElementById('notesReaderContent');
+  const inlineComposer = document.getElementById('notesInlineComposer');
+
+  emptyState.style.display = 'none';
+  readerContent.style.display = 'none';
+  inlineComposer.style.display = 'block';
+
+  const titleInput = document.getElementById('inlineNoteTitle');
+  const refInput = document.getElementById('inlineNoteVerseRef');
+  const contentInput = document.getElementById('inlineNoteContent');
+  const heading = document.getElementById('notesComposerHeading');
+
+  if (editingNoteId !== null) {
+    heading.textContent = 'Edit Note';
+    const note = notesCache.find(n => n.id === editingNoteId);
+    if (note) {
+      titleInput.value = note.title || '';
+      refInput.value = note.book ? `${note.book} ${note.chapter || ''}:${note.verse || ''}`.trim() : '';
+      contentInput.value = note.content || '';
+    }
+  } else {
+    heading.textContent = 'New Note';
+    titleInput.value = '';
+    refInput.value = '';
+    contentInput.value = '';
+  }
+
+  titleInput.focus();
+
+  document.getElementById('inlineCancelNote').onclick = () => {
+    editingNoteId = null;
+    renderNotesDetailPanel();
+  };
+
+  document.getElementById('inlineSaveNoteBtn').onclick = async () => {
+    const title = titleInput.value.trim();
+    const content = contentInput.value.trim();
+    if (!title || !content) {
+      toast('Title and content are required', 'warning');
+      return;
+    }
+    const verseRef = refInput.value.trim();
     let book = null, chapter = null, verse = null;
     if (verseRef) {
-      const match = verseRef.match(/^(\d?\s?\w+)\s+(\d+):?(\d+)?$/);
-      if (match) { book = match[1].trim(); chapter = parseInt(match[2]); verse = match[3] ? parseInt(match[3]) : null; }
+      const parsed = parseVerseReference(verseRef);
+      if (parsed) {
+        book = parsed.book;
+        chapter = parsed.chapter;
+        verse = parsed.verse;
+      }
     }
-    await window.api.saveNote(title, content, book, chapter, verse);
-    showSolar();
-    document.getElementById('noteTitle').value = '';
-    document.getElementById('noteContent').value = '';
-    document.getElementById('noteVerseRef').value = '';
+
+    if (editingNoteId !== null) {
+      await window.api.updateNote(editingNoteId, title, content);
+      
+      const cacheIdx = notesCache.findIndex(n => n.id === editingNoteId);
+      if (cacheIdx !== -1) {
+        notesCache[cacheIdx].title = title;
+        notesCache[cacheIdx].content = content;
+        if (verseRef) {
+          notesCache[cacheIdx].book = book;
+          notesCache[cacheIdx].chapter = chapter;
+          notesCache[cacheIdx].verse = verse;
+        }
+        selectedNote = notesCache[cacheIdx];
+      }
+      
+      toast('Note updated!', 'success');
+    } else {
+      const res = await window.api.saveNote(title, content, book, chapter, verse);
+      
+      notesCache = await window.api.getNotes();
+      if (res.success && res.id) {
+        selectedNote = notesCache.find(n => n.id === res.id) || notesCache[0];
+      } else {
+        selectedNote = notesCache[0];
+      }
+      
+      toast('Note saved!', 'success');
+    }
+
+    editingNoteId = null;
     await loadNotes();
-    toast('Note saved!', 'success');
   };
 }
 
