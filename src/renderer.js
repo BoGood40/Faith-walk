@@ -295,14 +295,37 @@ function updateDate() {
 
 function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+    btn.addEventListener('click', () => {
+      navigateTo(btn.dataset.page);
+      // Close drawer on mobile item tap
+      document.querySelector('.sidebar')?.classList.remove('open');
+      document.getElementById('sidebarOverlay')?.classList.remove('active');
+    });
   });
+
+  // Mobile sidebar drawer & overlay backdrop controllers
+  const menuToggle = document.getElementById('menuToggle');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const sidebar = document.querySelector('.sidebar');
+
+  if (menuToggle && sidebar && sidebarOverlay) {
+    menuToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sidebar.classList.add('open');
+      sidebarOverlay.classList.add('active');
+    });
+
+    sidebarOverlay.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('active');
+    });
+  }
 }
 
 async function navigateTo(page) {
   currentPage = page;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.querySelector(`.nav-btn[data-page="${page}"]`)?.classList.add('active');
+  document.querySelectorAll(`.nav-btn[data-page="${page}"]`).forEach(b => b.classList.add('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`)?.classList.add('active');
   await window.api.logActivity('page_visit', page);

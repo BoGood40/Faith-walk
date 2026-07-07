@@ -3518,3 +3518,116 @@ html, body { min-width: 480px; }
     grid-template-columns: 1fr;
   }
 }
+
+/* =============================================================================
+   MOBILE OVERLAYS, DRAWER & BOTTOM NAVIGATION
+   ============================================================================= */
+
+/* Bottom Navigation Bar for Mobile */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: rgba(15, 17, 23, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-color);
+  z-index: 999;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.bottom-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  gap: 4px;
+  flex: 1;
+  height: 100%;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.1s ease;
+  padding: 4px 0;
+}
+
+.bottom-nav-btn svg {
+  width: 20px;
+  height: 20px;
+  transition: stroke var(--transition), transform var(--transition);
+}
+
+.bottom-nav-btn.active {
+  color: var(--accent-primary);
+}
+
+.bottom-nav-btn.active svg {
+  stroke: var(--accent-primary);
+  transform: translateY(-2px);
+}
+
+.bottom-nav-btn:active {
+  transform: scale(0.95);
+}
+
+/* Responsive Overrides */
+@media (max-width: 768px) {
+  /* Show Bottom Navigation */
+  .bottom-nav {
+    display: flex;
+  }
+  
+  /* Push main content up to not overlap bottom nav */
+  .main-content {
+    padding-bottom: 64px !important;
+  }
+  
+  /* Convert Sidebar to an animated slide-out Drawer */
+  .sidebar {
+    display: flex !important; /* Override 'display: none' in previous media query */
+    position: fixed;
+    top: 0;
+    left: -280px; /* Hidden off-screen by default */
+    width: 280px;
+    height: 100vh;
+    z-index: 1001; /* Above everything else */
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-secondary);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar.open {
+    left: 0 !important; /* Slide drawer in! */
+  }
+
+  /* Hamburger Menu Toggle Style on Mobile */
+  #menuToggle {
+    display: flex !important;
+  }
+
+  /* Sidebar Backdrop Overlay on Mobile */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 1000;
+  }
+
+  .sidebar-overlay.active {
+    display: block !important;
+  }
+}
