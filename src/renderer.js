@@ -375,7 +375,10 @@ async function updateDailyGoals(stats) {
 }
 
 async function loadDashDailyVerse() {
-  const verse = await window.api.getRandomUnseenVerse();
+  let verse = await window.api.getRandomUnseenVerse();
+  if (Array.isArray(verse)) {
+    verse = verse[0];
+  }
   if (verse) {
     document.getElementById('dashDailyVerse').innerHTML = `<div class="verse-ref">${verse.book} ${verse.chapter}:${verse.verse}</div><div class="verse-text">${verse.text}</div>`;
     await window.api.markVerseSeen(verse.book, verse.chapter, verse.verse);
@@ -409,7 +412,10 @@ async function loadDailyVerse(direction) {
   } else if (direction === 'next' && dailyVerseIndex < dailyVerseHistory.length - 1) {
     dailyVerseIndex++;
   } else {
-    const verse = await window.api.getRandomUnseenVerse();
+    let verse = await window.api.getRandomUnseenVerse();
+    if (Array.isArray(verse)) {
+      verse = verse[0];
+    }
     if (verse) {
       dailyVerseHistory.push({ book: verse.book, chapter: verse.chapter, verse: verse.verse, text: verse.text });
       dailyVerseIndex = dailyVerseHistory.length - 1;
