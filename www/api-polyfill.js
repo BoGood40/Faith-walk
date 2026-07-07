@@ -177,14 +177,15 @@
     getRandomUnseenVerse: async (limit) => {
       const seen = store.get('seen_verses');
       const b = getBible();
-      if (!b) return [];
+      if (!b) return null;
       const all = [];
       b.books.forEach(bk => bk.chapters.forEach(ch => ch.verses.forEach(v => {
         if (!seen.find(s => s.book === bk.englishName && s.chapter === ch.chapter && s.verse === v.number))
           all.push({ book: bk.englishName, chapter: ch.chapter, verse: v.number, text: v.text });
       })));
+      if (all.length === 0) return null;
       const shuffled = all.sort(() => Math.random() - 0.5);
-      return shuffled.slice(0, limit || 1);
+      return limit ? shuffled.slice(0, limit) : (shuffled[0] || null);
     },
 
     /* ---- Bible ---- */

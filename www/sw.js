@@ -1,4 +1,4 @@
-const CACHE = 'faith-walk-v2';
+const CACHE = 'faith-walk-v3';
 const URLS = [
   '.',
   'index.html',
