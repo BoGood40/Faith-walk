@@ -6,15 +6,15 @@ A premium, modern multi-platform application designed to help believers grow in 
 
 ---
 
-## 📱 Mobile App (Android APK) — v1.1 Mobile-Friendly Update!
+## 📱 Mobile App (Android APK) — v1.2 Update (Mobile Overhaul & Bugfix)!
 
-We have successfully customized and enhanced the application layout to be highly responsive and mobile-friendly! You can download the compiled APK file directly on your phone:
+We have successfully customized and enhanced the application layout to be highly responsive, mobile-friendly, and resolved the "undefined" daily Bible verse bug! You can download the compiled APK file directly on your phone:
 
-* **📥 [Direct Download Android APK (v1.1)](https://github.com/BoGood40/Faith-walk/raw/main/app-debug.apk)**
+* **📥 [Direct Download Android APK (v1.2)](https://github.com/BoGood40/Faith-walk/raw/main/app-debug.apk)**
 
 > [!IMPORTANT]
 > **Upgrading from a previous version?**
-> Please **uninstall** any previous versions of the Faith Walk app from your device before installing this update. This completely clears out the old browser/asset caches and ensures the new bottom navigation bar and slide drawer display instantly.
+> Please **uninstall** any previous versions of the Faith Walk app from your device before installing this update. This completely clears out the old browser/asset caches and ensures the new bottom navigation bar, drawer menu, and daily Bible verse display instantly and correctly.
 
 ### How to Install on Your Android Device:
 1. Tap the **[Direct Download Android APK](https://github.com/BoGood40/Faith-walk/raw/main/app-debug.apk)** link from your mobile device.
