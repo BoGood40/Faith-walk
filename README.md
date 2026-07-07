@@ -6,16 +6,21 @@ A premium, modern multi-platform application designed to help believers grow in 
 
 ---
 
-## 📱 Mobile App (Android APK)
-We have included a pre-compiled, native Android APK in the repository! You can download and install it on your phone immediately:
-* **📥 [Download Android APK (app-debug.apk)](https://github.com/BoGood40/Faith-walk/blob/main/app-debug.apk)**
+## 📱 Mobile App (Android APK) — v1.1 Mobile-Friendly Update!
 
-### How to Install the APK on Your Android Device:
-1. Open this repository in your phone's browser.
-2. Tap on the **[app-debug.apk](https://github.com/BoGood40/Faith-walk/blob/main/app-debug.apk)** file.
-3. Tap **Download** (or "View raw") to download the file to your device.
-4. Open the downloaded `.apk` file.
-5. If prompted, allow installations from "Unknown Sources" or your browser, and tap **Install**.
+We have successfully customized and enhanced the application layout to be highly responsive and mobile-friendly! You can download the compiled APK file directly on your phone:
+
+* **📥 [Direct Download Android APK (v1.1)](https://github.com/BoGood40/Faith-walk/raw/main/app-debug.apk)**
+
+> [!IMPORTANT]
+> **Upgrading from a previous version?**
+> Please **uninstall** any previous versions of the Faith Walk app from your device before installing this update. This completely clears out the old browser/asset caches and ensures the new bottom navigation bar and slide drawer display instantly.
+
+### How to Install on Your Android Device:
+1. Tap the **[Direct Download Android APK](https://github.com/BoGood40/Faith-walk/raw/main/app-debug.apk)** link from your mobile device.
+2. Tap **Download** when prompted by your browser.
+3. Open the downloaded `.apk` file.
+4. If prompted, toggle **"Allow installations from this source"** and tap **Install**.
 
 ---
 
