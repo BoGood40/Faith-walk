@@ -2485,7 +2485,7 @@ select.reader-select {
 }
 
 /* Improve window resize handling */
-html, body { min-width: 480px; }
+html, body { min-width: 320px; }
 .sidebar { min-width: 200px; transition: width var(--transition); }
 .main-content { min-width: 0; overflow-x: hidden; }
 .bible-text { word-wrap: break-word; overflow-wrap: break-word; }
